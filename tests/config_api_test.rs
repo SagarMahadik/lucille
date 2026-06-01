@@ -69,7 +69,7 @@ fn test_empty_config_uses_default() {
 }
 
 #[test]
-fn test_custom_config_ignores_cherrypic_defaults() {
+fn test_custom_config_ignores_common_fields() {
     let config = ParserConfig::new()
         .with_field("stars", "number");
     let sq = parse_query_with_config("stars:5", &config)
@@ -99,12 +99,12 @@ fn test_abbreviation_prevails_over_builtin() {
 }
 
 #[test]
-fn test_cherrypic_defaults_matches_parse_query() {
-    let config = ParserConfig::cherrypic_defaults();
+fn test_common_fields_matches_parse_query() {
+    let config = ParserConfig::common_fields();
     let query = "isFavorite:true domain:google.com";
     let default_sq = parse_query(query).and_then(|n| convert_to_structured(&n));
     let config_sq = parse_query_with_config(query, &config).and_then(|n| convert_to_structured(&n));
-    assert_eq!(default_sq, config_sq, "cherrypic_defaults should match parse_query");
+    assert_eq!(default_sq, config_sq, "common_fields should match parse_query");
 }
 
 #[test]

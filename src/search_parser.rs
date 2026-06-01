@@ -29,21 +29,21 @@ impl ParserConfig {
         self
     }
 
-    pub fn cherrypic_defaults() -> Self {
+    pub fn common_fields() -> Self {
         Self {
-            field_types: cherrypic_field_types_raw(),
-            abbreviations: cherrypic_abbreviations_raw(),
+            field_types: builtin_field_types_raw(),
+            abbreviations: builtin_abbreviations_raw(),
         }
     }
 }
 
 impl Default for ParserConfig {
     fn default() -> Self {
-        Self::cherrypic_defaults()
+        Self::common_fields()
     }
 }
 
-fn cherrypic_field_types_raw() -> HashMap<String, String> {
+fn builtin_field_types_raw() -> HashMap<String, String> {
     let mut m = HashMap::new();
     m.insert("tags".to_string(), "multiSelect".to_string());
     m.insert("tag".to_string(), "multiSelect".to_string());
@@ -77,7 +77,7 @@ fn cherrypic_field_types_raw() -> HashMap<String, String> {
     m
 }
 
-fn cherrypic_abbreviations_raw() -> HashMap<String, String> {
+fn builtin_abbreviations_raw() -> HashMap<String, String> {
     let mut m = HashMap::new();
     m.insert("t".to_string(), "tags".to_string());
     m.insert("tag".to_string(), "tags".to_string());

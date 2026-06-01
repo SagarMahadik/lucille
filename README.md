@@ -171,7 +171,7 @@ Flattened form matching standard search API patterns:
 
 ### Custom schema with `ParserConfig`
 
-By default Lucille ships with the Cherrypic field schema (see [History](#history)). To use it with your own schema, build a `ParserConfig`:
+To use your own schema instead of the built-in defaults, build a `ParserConfig`:
 
 ```rust
 use lucille::{ParserConfig, parse_query_with_config, convert_to_structured};
@@ -191,10 +191,10 @@ let result = parse_query_with_config(
 )?;
 ```
 
-You can also extend the Cherrypic defaults instead of starting from scratch:
+You can also extend the built-in defaults instead of starting from scratch:
 
 ```rust
-let config = ParserConfig::cherrypic_defaults()
+let config = ParserConfig::common_fields()
     .with_field("myCustomField", "number");
 ```
 
@@ -203,7 +203,7 @@ let config = ParserConfig::cherrypic_defaults()
 | Method | Description |
 |---|---|
 | `ParserConfig::new()` | Empty config — start from scratch |
-| `ParserConfig::cherrypic_defaults()` | Pre-populated with Cherrypic fields/abbreviations |
+| `ParserConfig::common_fields()` | Pre-populated with built-in fields and abbreviations |
 | `.with_field(name, type)` | Register a field with its type |
 | `.with_abbreviation(short, full)` | Register a shorthand alias |
 
@@ -262,10 +262,6 @@ let ast = parse_query_with_config(query, &tenant_config)?;
 | `hybrid_tokenize(text: &str) -> String` | Lowercase + split on non-alphanumeric, join with spaces |
 | `normalize_for_search(text: &str) -> String` | Lowercase only |
 | `extract_note_text(note_json: &Value) -> String` | Flatten a structured note JSON to plain text |
-
-## History
-
-Lucille was originally extracted from [Cherrypic](https://cherrypic.app/)'s web extension desktop search parser. The Rust parser was written alongside a [JavaScript reference parser](https://github.com/cherrypic/web-extension-desktop) that produces the same `StructuredQuery` output. Lucille generalizes that logic into a standalone library with custom `ParserConfig` support.
 
 ## License
 
