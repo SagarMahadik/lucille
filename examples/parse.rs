@@ -1,7 +1,7 @@
 use lucille::{ParserConfig, parse_query, parse_query_with_config, convert_to_structured};
 
 fn main() {
-    println!("=== Default Cherrypic config ===");
+    println!("=== Default config ===");
     let queries = [
         "domain:google.com isFavorite:true",
         "t:rust rating:>3",

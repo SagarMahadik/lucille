@@ -19,7 +19,7 @@ Instead of asking an LLM to generate SQL, MongoDB aggregations, or backend-speci
 ```
 User request:       "show my favorite Rust articles from the last two years"
 LLM generates:      type:article tag:rust isFavorite:true createdAt:>2024-01-01
-Lucille parses:     ✅ validated AST (not raw SQL injection)
+Lucille parses:     ✅ validated AST, not raw backend query text
 App translates:     → your query system (SQL / Elasticsearch / in-memory filter)
 ```
 
