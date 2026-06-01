@@ -1,11 +1,34 @@
 # Lucille
 
-A Lucene-like search query parser for Cherrypic, extracted as a standalone Rust library.
+**Rust parser for LLM-safe Lucene-style search syntax into a typed AST.**
+
+Lucille parses compact, Lucene-inspired search queries into a typed, backend-neutral AST that applications can validate, inspect, and translate into their own query systems — without exposing raw SQL, MongoDB, or proprietary DSLs to untrusted input.
 
 ```rust
 let node = lucille::parse_query("domain:google.com isFavorite:true")?;
 let structured = lucille::convert_to_structured(&node);
+// → typed, validated AST ready for translation
 ```
+
+## Why Lucille?
+
+### LLM-safe query generation
+
+Instead of asking an LLM to generate SQL, MongoDB aggregations, or backend-specific query DSLs, ask it to emit **Lucille syntax** — a compact, well-defined search grammar that Lucille can parse, validate, and convert into a typed AST.
+
+```
+User request:       "show my favorite Rust articles from the last two years"
+LLM generates:      type:article tag:rust isFavorite:true createdAt:>2024-01-01
+Lucille parses:     ✅ validated AST (not raw SQL injection)
+App translates:     → your query system (SQL / Elasticsearch / in-memory filter)
+```
+
+### Key benefits
+
+- **No SQL injection** — the LLM can only emit structured filters, not arbitrary query code
+- **Validation layer** — unknown fields, types, and malformed syntax are caught at parse time
+- **Backend-neutral** — single AST translates to any query backend
+- **Typed filters** — numbers, dates, booleans, multi-select, and text are distinguished in the AST
 
 ## Quick Start
 
@@ -102,6 +125,8 @@ domain:*.com      # ends with
 | `created:` | `createdAt:` |
 | `modified:` | `updatedAt:` |
 
+Custom abbreviations are easy to add via `ParserConfig::with_abbreviation()`.
+
 ### Custom properties
 
 ```
@@ -109,18 +134,44 @@ cp_author:Taleb
 cp_isbn:9780143039433
 ```
 
-## API
+## The AST (main product)
 
-| Function | Description |
+Lucille produces two representations of a parsed query. Both are fully typed, serializable, and backend-neutral.
+
+### `SearchNode` — full binary AST
+
+Represents the complete parse tree with logical operators as binary nodes:
+
+| Variant | Purpose |
 |---|---|
-| `parse_query(input: &str) -> Option<SearchNode>` | Parse a search string into a raw AST |
-| `convert_to_structured(node: &SearchNode) -> Option<StructuredQuery>` | Transform AST into a flattened structured query |
-| `process_filter(property, value, is_negative, is_tag) -> Option<SearchNode>` | Process a single filter token |
-| `hybrid_tokenize(text: &str) -> String` | Tokenize text for FTS indexing |
+| `And { left, right }` | Logical AND |
+| `Or { left, right }` | Logical OR |
+| `Not { expression }` | Negation wrapper |
+| `Filter { field, condition, value, field_type, is_custom_property }` | A single atomic filter |
+
+### `StructuredQuery` — flattened query
+
+Flattened form matching standard search API patterns:
+
+| Variant | Shape |
+|---|---|
+| `Filter` | `{ field, condition, value, fieldType, isCustomProperty }` |
+| `Group` | `{ operator: "and"\|"or", filters: [...] }` |
+| `NotGroup` | `{ operator: "not", filter: {...} }` |
+
+### Field types in the AST
+
+| Type | Condition examples | Value type |
+|---|---|---|
+| `text` | `is`, `isNot`, `contains`, `startsWith`, `endsWith`, `isAnyOf`, `isNotAnyOf` | string or string[] |
+| `boolean` | `"true"` / `"false"` (as string, matches JS output) | bool |
+| `number` | `is`, `isNot`, `greaterThan`, `lessThan`, `isGreaterThanOrEqualTo`, `isLessThanOrEqualTo` | number |
+| `date` | `is`, `before`, `after`, `onOrBefore`, `onOrAfter` | string (ISO date) |
+| `multiSelect` | `includes`, `doesNotInclude`, `includeAnyOf`, `excludeAnyOf`, `includeAllOf`, `excludeAllOf` | string or string[] |
 
 ### Custom schema with `ParserConfig`
 
-By default Lucille ships with the Cherrypic field schema. To use it with your own schema, build a `ParserConfig`:
+By default Lucille ships with the Cherrypic field schema (see [History](#history)). To use it with your own schema, build a `ParserConfig`:
 
 ```rust
 use lucille::{ParserConfig, parse_query_with_config, convert_to_structured};
@@ -147,43 +198,74 @@ let config = ParserConfig::cherrypic_defaults()
     .with_field("myCustomField", "number");
 ```
 
-### Methods
+### ParserConfig methods
 
 | Method | Description |
 |---|---|
-| `ParserConfig::new()` | Empty config |
-| `ParserConfig::cherrypic_defaults()` | Pre-populated with all Cherrypic fields/abbreviations |
+| `ParserConfig::new()` | Empty config — start from scratch |
+| `ParserConfig::cherrypic_defaults()` | Pre-populated with Cherrypic fields/abbreviations |
 | `.with_field(name, type)` | Register a field with its type |
 | `.with_abbreviation(short, full)` | Register a shorthand alias |
 
-### Supported field types
+## LLM-safe query generation (extended)
 
-| Type | Behaviors |
+Lucille is designed to bridge LLMs and query systems safely.
+
+### Pattern: validate-before-execute
+
+```
+LLM → Lucille syntax string → Lucille parser → typed AST → your query executor
+```
+
+The LLM never generates raw SQL, MongoDB JSON, or REST parameters. It emits a restricted grammar that Lucille validates before your app touches it.
+
+### Example: RAG pipeline
+
+```
+User: "find my starred Python libraries from 2024"
+LLM:  tag:python isFavorite:true createdAt:>=2024-01-01
+Lucille: ✅ validates field types, parses date, produces typed AST
+App:   → translates to SQL WHERE or vector store filter
+```
+
+### Example: multi-tenant search
+
+```rust
+// Per-tenant schema: each tenant has different searchable fields
+let tenant_config = ParserConfig::new()
+    .with_field("status", "multiSelect")
+    .with_field("assignee", "text")
+    .with_field("priority", "number");
+
+// LLM generates tenant-aware query
+let query = "status:open,active priority:>5 assignee:me";
+let ast = parse_query_with_config(query, &tenant_config)?;
+// Safely translate ast → tenant's query backend
+```
+
+## Full API reference
+
+### Core functions
+
+| Function | Description |
 |---|---|
-| `text` | Tokenized match, wildcards `*`, comma-separated `isAnyOf`, FTS field mapping (`title`→`title_tokens`, etc.) |
-| `boolean` | `true`/`false`/`0`/`1`, XOR negation |
-| `number` | Operators `>`, `<`, `>=`, `<=`, bare numbers, negation inverts operator |
-| `date` | Operators `>`, `<`, `>=`, `<=`, negation inverts operator |
-| `multiSelect` | Comma-separated values, auto `includes`/`includeAnyOf`/`excludeAnyOf` |
+| `parse_query(input: &str) -> Option<SearchNode>` | Parse a search string into a raw AST |
+| `parse_query_with_config(input, config) -> Option<SearchNode>` | Parse with custom field schema |
+| `convert_to_structured(node: &SearchNode) -> Option<StructuredQuery>` | Transform AST into flattened structured query |
+| `process_filter(property, value, is_negative, is_tag) -> Option<SearchNode>` | Process a single filter token (uses defaults) |
+| `process_filter_with_config(property, value, is_negative, is_tag, config) -> Option<SearchNode>` | Process a single filter token with custom config |
 
-## Output types
+### Tokenizer utilities
 
-**`SearchNode`** — binary AST (`.type` = `AND` / `OR` / `NOT` / `FILTER`).
-
-**`StructuredQuery`** — flattened format matching Cherrypic's JS parser output:
-- `{ field, condition, value, fieldType, isCustomProperty }` — a single filter
-- `{ operator: "and"|"or", filters: [...] }` — grouped filters
-- `{ operator: "not", filter: {...} }` — negated group
-
-### Supported field types
-
-| Field type | Behavior |
+| Function | Description |
 |---|---|
-| `text` | Tokenized FTS match, supports wildcards and comma-separated OR |
-| `boolean` | `true` / `false` / `0` / `1`, XOR negation |
-| `number` | Operators: `>`, `<`, `>=`, `<=`, `=` |
-| `date` | Operators: `>`, `<`, `>=`, `<=` |
-| `multiSelect` | Single or comma-separated values, `includes`/`includeAnyOf`/`excludeAnyOf` |
+| `hybrid_tokenize(text: &str) -> String` | Lowercase + split on non-alphanumeric, join with spaces |
+| `normalize_for_search(text: &str) -> String` | Lowercase only |
+| `extract_note_text(note_json: &Value) -> String` | Flatten a structured note JSON to plain text |
+
+## History
+
+Lucille was originally extracted from [Cherrypic](https://cherrypic.app/)'s web extension desktop search parser. The Rust parser was written alongside a [JavaScript reference parser](https://github.com/cherrypic/web-extension-desktop) that produces the same `StructuredQuery` output. Lucille generalizes that logic into a standalone library with custom `ParserConfig` support.
 
 ## License
 

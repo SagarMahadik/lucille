@@ -3,7 +3,9 @@ name = "lucille"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-description = "Cherrypic's Lucene-like search query parser"
+description = "Rust parser for LLM-safe Lucene-style search syntax into a typed AST."
+keywords = ["rust", "parser", "search", "lucene", "query-language", "ast", "llm", "rag"]
+categories = ["parsing", "text-processing"]
 
 [lib]
 crate-type = ["rlib"]
