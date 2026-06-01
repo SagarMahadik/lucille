@@ -25,7 +25,7 @@ App translates:     → your query system (SQL / Elasticsearch / in-memory filte
 
 ### Key benefits
 
-- **No SQL injection** — the LLM can only emit structured filters, not arbitrary query code
+- **No raw backend query text** — the LLM emits structured Lucille syntax, not arbitrary SQL, MongoDB, or DSL code
 - **Validation layer** — unknown fields, types, and malformed syntax are caught at parse time
 - **Backend-neutral** — single AST translates to any query backend
 - **Typed filters** — numbers, dates, booleans, multi-select, and text are distinguished in the AST
